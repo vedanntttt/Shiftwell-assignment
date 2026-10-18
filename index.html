@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shiftwell Swap Auto-Approval</title>
+<meta name="description" content="Prototype: shift swaps that pass the rules are approved instantly. Only exceptions reach a human.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #FBFAF6;
+    --card: #FFFFFF;
+    --subtle: #F6F4EE;
+    --border: #ECE8DF;
+    --border-strong: #DAD5C9;
+    --text: #1C1A16;
+    --muted: #6F6A60;
+    --faint: #A29C90;
+    --primary: #1C1A16;
+    --primary-hover: #3A3730;
+    --meter: #CFC9BC;
+
+    --success: #2F7D4F; --success-bg: #EDF5EF; --success-text: #276B43;
+    --warning: #B7791F; --warning-bg: #FBF3E3; --warning-text: #8A5A12;
+    --info:    #3B5BA9; --info-bg:    #EDF1F9; --info-text:    #2F4A8C;
+    --danger:  #B83A35; --danger-bg:  #FAEDEB; --danger-text:  #9A2F2B;
+    --skip:    #A29C90; --skip-bg:    #F3F1EB; --skip-text:    #6F6A60;
+
+    --shadow: 0 1px 2px rgba(28, 26, 22, 0.04);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3 { font-weight: 600; margin: 0; }
+  p { margin: 0; }
+  [hidden] { display: none !important; }
+
+  :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+  .ico { width: 1em; height: 1em; flex: none; display: block; }
+  .muted { color: var(--muted); }
+
+  /* App shell */
+  .app { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 100vh; }
+  .sidebar {
+    position: sticky; top: 0; height: 100vh;
+    display: flex; flex-direction: column; gap: 28px;
+    padding: 20px 14px; background: var(--card); border-right: 1px solid var(--border);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 0 8px; color: inherit; text-decoration: none; }
+  .brand-mark { flex: none; width: 28px; height: 28px; border-radius: 7px; background: var(--primary); color: #FFFFFF; display: grid; place-items: center; font-weight: 600; font-size: 14px; }
+  .brand-name { font-weight: 600; font-size: 14px; line-height: 1.25; }
+  .brand-sub { font-size: 12px; color: var(--muted); line-height: 1.25; }
+  .nav { display: flex; flex-direction: column; gap: 2px; }
+  .nav a {
+    display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 7px;
+    color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500;
+  }
+  .nav a .ico { font-size: 16px; }
+  .nav a:hover { background: var(--subtle); color: var(--text); }
+  .nav a[aria-current="page"] { background: var(--subtle); color: var(--text); }
+  .nav-badge { margin-left: auto; min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--border); color: var(--text); font-size: 11px; font-weight: 600; line-height: 20px; text-align: center; }
+  .sidebar-foot { margin-top: auto; padding: 0 8px; font-size: 12px; color: var(--faint); }
+
+  .content { min-width: 0; display: flex; flex-direction: column; }
+  .page { width: 100%; max-width: 1120px; margin: 0 auto; padding: 36px 40px 16px; }
+  .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+  .page-head h1 { font-size: 22px; letter-spacing: -0.015em; }
+  .page-head h1:focus { outline: none; }
+  .page-head p { color: var(--muted); font-size: 14px; margin-top: 4px; max-width: 640px; }
+  .tag {
+    flex: none; white-space: nowrap;
+    font-size: 12px; font-weight: 500; color: var(--muted);
+    padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--card);
+  }
+
+  .footer { text-align: center; color: var(--faint); font-size: 12px; padding: 32px 16px 40px; margin-top: auto; }
+
+  /* How it works */
+  .steps {
+    list-style: none; padding: 0; margin: 0 0 28px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);
+  }
+  .step { display: flex; align-items: center; gap: 12px; padding: 14px 18px; font-size: 14px; }
+  .step + .step { border-left: 1px solid var(--border); }
+  .step-num {
+    flex: none; width: 24px; height: 24px; border-radius: 50%;
+    display: grid; place-items: center;
+    border: 1px solid var(--border-strong); color: var(--muted); font-weight: 600; font-size: 12px;
+  }
+
+  /* Cards and layout */
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px; box-shadow: var(--shadow); min-width: 0;
+  }
+  .card h2 { font-size: 15px; letter-spacing: -0.005em; }
+  .card-sub { color: var(--muted); font-size: 13px; margin: 2px 0 18px; }
+  .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .card-head .card-sub { margin-bottom: 18px; }
+  .section-title { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 0 0 12px; }
+  .section-title h2 { font-size: 15px; }
+
+  .grid-2 { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  .grid-2.even { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stack { display: grid; gap: 20px; min-width: 0; }
+  .mt { margin-top: 20px; }
+
+  .link {
+    display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+    color: var(--text); font-size: 13px; font-weight: 500; text-decoration: none; border-radius: 4px;
+  }
+  .link:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .link .ico { font-size: 12px; }
+
+  /* Form controls */
+  .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .field label, .field-label { font-size: 13px; font-weight: 500; }
+  .field small { color: var(--muted); font-size: 12px; }
+  select, input[type="number"] {
+    width: 100%; min-width: 0; height: 40px;
+    font: inherit; font-size: 14px; color: var(--text);
+    background-color: var(--card); border: 1px solid var(--border-strong); border-radius: 8px;
+    padding: 0 12px;
+    transition: border-color 120ms ease;
+  }
+  select:hover, input[type="number"]:hover { border-color: var(--faint); }
+  select:focus-visible, input[type="number"]:focus-visible { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(28, 26, 22, 0.08); }
+  select {
+    appearance: none; -webkit-appearance: none; cursor: pointer;
+    padding-right: 36px; text-overflow: ellipsis;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%236F6A60' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center; background-size: 14px;
+  }
+  .num-wrap { position: relative; }
+  .num-wrap input { padding-right: 48px; }
+  .num-wrap span { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 13px; pointer-events: none; }
+  input[aria-invalid="true"] { border-color: var(--danger); }
+
+  /* Toggles */
+  .toggle-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .toggle-row:first-of-type { padding-top: 0; }
+  .toggle-row label { cursor: pointer; font-size: 14px; font-weight: 500; }
+  .toggle-row small { display: block; color: var(--muted); font-size: 12px; font-weight: 400; }
+  .switch { position: relative; width: 36px; height: 20px; flex: none; }
+  .switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; z-index: 1; }
+  .switch .track { position: absolute; inset: 0; border-radius: 999px; background: var(--border-strong); transition: background 150ms ease; }
+  .switch .track::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+    background: #FFFFFF; box-shadow: 0 1px 2px rgba(28, 26, 22, 0.2); transition: left 150ms ease;
+  }
+  .switch input:checked + .track { background: var(--primary); }
+  .switch input:checked + .track::after { left: 18px; }
+  .switch input:focus-visible + .track { outline: 2px solid var(--primary); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { .switch .track, .switch .track::after { transition: none; } }
+  .rules-fields { margin-top: 18px; }
+  .rules-note { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    height: 40px; padding: 0 18px; border: 1px solid transparent; border-radius: 8px;
+    background: var(--primary); color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 500;
+    cursor: pointer; text-decoration: none; white-space: nowrap;
+    transition: background 120ms ease;
+  }
+  .btn:hover { background: var(--primary-hover); }
+  .btn-secondary { background: var(--card); color: var(--text); border-color: var(--border-strong); }
+  .btn-secondary:hover { background: var(--subtle); }
+  .btn-sm { height: 32px; padding: 0 12px; font-size: 13px; }
+  .btn-block { width: 100%; margin-top: 6px; }
+
+  /* Segmented control */
+  .segmented {
+    display: inline-flex; gap: 2px; padding: 3px; max-width: 100%; overflow-x: auto;
+    border-radius: 9px; background: var(--subtle); border: 1px solid var(--border);
+  }
+  .segmented button {
+    border: 0; background: transparent; font: inherit; font-size: 13px; font-weight: 500; color: var(--muted);
+    padding: 5px 12px; border-radius: 6px; cursor: pointer; white-space: nowrap;
+  }
+  .segmented button:hover { color: var(--text); }
+  .segmented button[aria-pressed="true"] { background: var(--card); color: var(--text); box-shadow: 0 1px 2px rgba(28, 26, 22, 0.08); }
+
+  /* Tones */
+  .tone-success { --tone: var(--success); --tone-bg: var(--success-bg); --tone-text: var(--success-text); }
+  .tone-warning { --tone: var(--warning); --tone-bg: var(--warning-bg); --tone-text: var(--warning-text); }
+  .tone-info    { --tone: var(--info);    --tone-bg: var(--info-bg);    --tone-text: var(--info-text); }
+  .tone-danger  { --tone: var(--danger);  --tone-bg: var(--danger-bg);  --tone-text: var(--danger-text); }
+  .tone-skip    { --tone: var(--skip);    --tone-bg: var(--skip-bg);    --tone-text: var(--skip-text); }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+    padding: 2px 9px; border-radius: 999px;
+    background: var(--tone-bg); color: var(--tone-text);
+    font-size: 12px; font-weight: 500; line-height: 1.5;
+  }
+
+  /* Key-value list */
+  .kv { margin: 0; display: grid; }
+  .kv div { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .kv div:first-child { padding-top: 0; }
+  .kv div:last-child { border-bottom: 0; padding-bottom: 0; }
+  .kv dt { color: var(--muted); min-width: 0; }
+  .kv dd { margin: 0; font-weight: 500; text-align: right; }
+
+  /* Result */
+  .fade-in { animation: fade-in 180ms ease-out; }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .fade-in { animation: none; } }
+
+  .outcome {
+    display: flex; align-items: center; gap: 12px; margin-top: 14px;
+    padding: 14px 16px; border-radius: 10px;
+    background: var(--tone-bg); color: var(--tone-text);
+  }
+  .outcome-ico { flex: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--tone); color: #FFFFFF; font-size: 16px; }
+  .outcome-label { font-size: 17px; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; }
+  .outcome-sub { font-size: 13px; margin-top: 1px; opacity: 0.9; }
+  .swap-line { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .swap-line strong { color: var(--text); font-weight: 600; }
+
+  .checks { list-style: none; padding: 0; margin: 8px 0 12px; display: grid; }
+  .checks li { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .checks li:last-child { border-bottom: 0; }
+  .check-ico { flex: none; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: var(--tone-bg); color: var(--tone); font-size: 12px; margin-top: 1px; }
+  .check-name { font-size: 14px; font-weight: 500; }
+  .check-status { font-weight: 500; color: var(--tone-text); }
+  .check-text { font-size: 13px; color: var(--muted); }
+  .next { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 14px; border-top: 1px solid var(--border); font-size: 14px; color: var(--muted); }
+  .next strong { color: var(--text); font-weight: 600; }
+  .next .link { margin-left: auto; }
+
+  /* Staff (swap page) */
+  .staff { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+  .person { padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); }
+  .person.selected { border-color: var(--primary); background: var(--subtle); }
+  .person-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .person-name { font-weight: 600; font-size: 14px; }
+  .person-tag { font-size: 11px; font-weight: 500; color: var(--muted); }
+  .person.selected .person-tag { color: var(--text); }
+  .person-meta { color: var(--muted); font-size: 13px; }
+  .meter { height: 4px; border-radius: 999px; background: var(--border); margin: 10px 0 8px; overflow: hidden; }
+  .meter span { display: block; height: 100%; border-radius: 999px; background: var(--meter); }
+  .person.selected .meter span { background: var(--primary); }
+  .meter.over span, .person.selected .meter.over span { background: var(--info); }
+  .person-certs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+
+  /* Staff & shifts page */
+  .trow { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) 150px minmax(0, 1.6fr); gap: 16px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .trow:last-child { border-bottom: 0; }
+  .thead, .log-head { color: var(--faint); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; padding-top: 0; }
+  .trow .meter { margin: 6px 0 0; max-width: 140px; }
+  .m-label { display: none; }
+  .cert-list { display: grid; gap: 6px; }
+  .cert { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
+  .shift-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .shift-row:last-child { border-bottom: 0; }
+  .shift-row:first-child { padding-top: 0; }
+
+  /* Replay */
+  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .stat { padding: 16px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); min-width: 0; }
+  .stat-label { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--tone-text); }
+  .stat-value { font-size: 28px; font-weight: 600; line-height: 1.2; margin-top: 8px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .stat-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .compare { margin-top: 12px; padding: 12px 16px; border-radius: 10px; background: var(--subtle); font-size: 14px; color: var(--muted); }
+  .compare strong { color: var(--text); font-weight: 600; }
+  .empty { padding: 16px; border-radius: 10px; border: 1px dashed var(--border-strong); color: var(--muted); font-size: 14px; }
+  .replay-filter { margin-bottom: 16px; }
+
+  .replay-list { list-style: none; padding: 0; margin: 16px 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; }
+  .ri { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .ri-num { flex: none; width: 20px; color: var(--faint); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .ri-main { flex: 1 1 160px; min-width: 0; }
+  .ri-name { font-weight: 500; font-size: 14px; }
+  .ri-shift { color: var(--muted); font-size: 12px; }
+
+  /* Decision log */
+  .log-row { display: grid; grid-template-columns: 80px minmax(0, 1.3fr) 170px minmax(0, 2fr); gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .log-row:last-child { border-bottom: 0; }
+  .log-time { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .log-who strong { font-weight: 500; }
+  .log-who span { display: block; color: var(--muted); font-size: 12px; }
+  .log-reason { color: var(--muted); }
+
+  @media (max-width: 899px) {
+    .app { grid-template-columns: minmax(0, 1fr); }
+    .sidebar {
+      z-index: 10; height: auto; gap: 10px;
+      padding: 12px 16px 0; border-right: 0; border-bottom: 1px solid var(--border);
+    }
+    .nav { flex-direction: row; gap: 4px; overflow-x: auto; margin: 0 -16px; padding: 0 16px 10px; scrollbar-width: none; }
+    .nav::-webkit-scrollbar { display: none; }
+    .nav a { flex: none; white-space: nowrap; padding: 6px 10px; }
+    .nav-badge { margin-left: 2px; }
+    .sidebar-foot { display: none; }
+    .page { padding: 24px 24px 8px; }
+    .grid-2, .grid-2.even { grid-template-columns: minmax(0, 1fr); }
+    .steps { grid-template-columns: minmax(0, 1fr); }
+    .step + .step { border-left: 0; border-top: 1px solid var(--border); }
+    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .replay-list { grid-template-columns: minmax(0, 1fr); }
+    .thead, .log-head { display: none; }
+    .trow { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+    .m-label { display: block; color: var(--faint); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+    .log-row { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; }
+    .log-time { grid-column: 1 / -1; font-size: 12px; }
+    .log-reason { grid-column: 1 / -1; }
+  }
+  @media (max-width: 600px) {
+    .page { padding: 20px 16px 8px; }
+    .page-head h1 { font-size: 20px; }
+    .page-head .btn { width: 100%; }
+    .card { padding: 16px; }
+    .stats { gap: 10px; }
+    .stat { padding: 14px; }
+    .stat-value { font-size: 24px; }
+    .outcome-label { font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar">
+    <a class="brand" href="#/overview">
+      <span class="brand-mark" aria-hidden="true">S</span>
+      <span><span class="brand-name">Shiftwell</span><span class="brand-sub" style="display:block">Swap Auto-Approval</span></span>
+    </a>
+    <nav class="nav" aria-label="Main">
+      <a href="#/overview" data-route="overview"><span data-icon="home"></span>Overview</a>
+      <a href="#/swap" data-route="swap"><span data-icon="swap"></span>New swap</a>
+      <a href="#/rules" data-route="rules"><span data-icon="sliders"></span>Rules</a>
+      <a href="#/staff" data-route="staff"><span data-icon="users"></span>Staff &amp; shifts</a>
+      <a href="#/replay" data-route="replay"><span data-icon="replay"></span>Replay</a>
+      <a href="#/log" data-route="log"><span data-icon="list"></span>Decision log<span class="nav-badge" id="nav-log-count" hidden>0</span></a>
+    </nav>
+    <p class="sidebar-foot">Today is Sun 18 Oct 2026.<br>All data is fictional.</p>
+  </aside>
+
+  <div class="content">
+
+    <!-- Overview -->
+    <main class="page" data-page="overview">
+      <header class="page-head">
+        <div>
+          <h1 tabindex="-1">Swap Auto-Approval</h1>
+          <p>Prototype. Swaps that pass the rules are approved instantly. Only exceptions reach a human.</p>
+        </div>
+        <span class="tag">Fictional data</span>
+      </header>
+
+      <ol class="steps" aria-label="How it works">
+        <li class="step"><span class="step-num">1</span>Staff requests a swap</li>
+        <li class="step"><span class="step-num">2</span>Shiftwell checks role, certificates and weekly hours</li>
+        <li class="step"><span class="step-num">3</span>Approved instantly, or routed with a reason</li>
+      </ol>
+
+      <div class="section-title">
+        <h2>Sample week, both locations</h2>
+        <a class="link" href="#/replay">See all 20 swaps<span data-icon="chevron"></span></a>
+      </div>
+      <div id="ov-summary"></div>
+
+      <div class="grid-2 even mt">
+        <section class="card" aria-labelledby="ov-try-title">
+          <h2 id="ov-try-title">Try a swap</h2>
+          <p class="card-sub">Pick a shift and a colleague to take it. The result shows every check and who acts next.</p>
+          <a class="btn" href="#/swap">Check a swap</a>
+        </section>
+        <section class="card" aria-labelledby="ov-rules-title">
+          <div class="card-head">
+            <div>
+              <h2 id="ov-rules-title">Active rules</h2>
+              <p class="card-sub">Apply to every location.</p>
+            </div>
+            <a class="link" href="#/rules">Edit<span data-icon="chevron"></span></a>
+          </div>
+          <dl class="kv" id="ov-rules"></dl>
+        </section>
+      </div>
+    </main>
+
+    <!-- New swap -->
+    <main class="page" data-page="swap" hidden>
+      <header class="page-head">
+        <div>
+          <h1 tabindex="-1">New swap</h1>
+          <p>Pick a shift and who should take it. Shiftwell checks it against the current rules.</p>
+        </div>
+      </header>
+
+      <div class="grid-2">
+        <div class="stack">
+          <section class="card" aria-labelledby="req-title">
+            <h2 id="req-title">Swap request</h2>
+            <p class="card-sub">Swaps happen within one location.</p>
+            <div class="field">
+              <label for="f-location">Location</label>
+              <select id="f-location"></select>
+            </div>
+            <div class="field">
+              <label for="f-shift">Shift</label>
+              <select id="f-shift"></select>
+            </div>
+            <div class="field">
+              <label for="f-taker">Who takes the shift</label>
+              <select id="f-taker"></select>
+            </div>
+            <button type="button" class="btn btn-block" id="btn-check">Check swap</button>
+          </section>
+
+          <section class="card" aria-labelledby="result-title">
+            <h2 id="result-title">Result</h2>
+            <div id="result-body" aria-live="polite"></div>
+          </section>
+        </div>
+
+        <section class="card" aria-labelledby="staff-title">
+          <div class="card-head">
+            <div>
+              <h2 id="staff-title">Staff</h2>
+              <p class="card-sub" id="staff-sub"></p>
+            </div>
+            <a class="link" href="#/staff" id="link-all-staff">Details<span data-icon="chevron"></span></a>
+          </div>
+          <ul class="staff" id="staff-list"></ul>
+        </section>
+      </div>
+    </main>
+
+    <!-- Rules -->
+    <main class="page" data-page="rules" hidden>
+      <header class="page-head">
+        <div>
+          <h1 tabindex="-1">Rules</h1>
+          <p>Admin settings. They apply to every location and take effect instantly.</p>
+        </div>
+      </header>
+
+      <div class="grid-2">
+        <section class="card" aria-labelledby="rules-title">
+          <h2 id="rules-title">Approval rules</h2>
+          <p class="card-sub">What a swap must pass to skip the manager.</p>
+
+          <div class="toggle-row">
+            <label for="r-auto">Auto-approval<small>Off = how Shiftwell works today</small></label>
+            <span class="switch"><input type="checkbox" id="r-auto" role="switch" checked><span class="track" aria-hidden="true"></span></span>
+          </div>
+          <div class="toggle-row">
+            <label for="r-role">Check role / training<small>The taker must be trained for the shift's role.</small></label>
+            <span class="switch"><input type="checkbox" id="r-role" role="switch" checked><span class="track" aria-hidden="true"></span></span>
+          </div>
+          <div class="toggle-row">
+            <label for="r-cert">Check certificates<small>Required certificates must be valid on the shift date.</small></label>
+            <span class="switch"><input type="checkbox" id="r-cert" role="switch" checked><span class="track" aria-hidden="true"></span></span>
+          </div>
+
+          <div class="rules-fields">
+            <div class="field">
+              <label for="r-limit">Weekly hours limit</label>
+              <div class="num-wrap">
+                <input type="number" id="r-limit" min="1" max="168" step="1" value="48" inputmode="numeric">
+                <span aria-hidden="true">hrs</span>
+              </div>
+              <small>Hours already this week plus the shift must stay within this.</small>
+            </div>
+            <div class="field">
+              <label for="r-route">Send over-limit swaps to</label>
+              <select id="r-route">
+                <option>Regional Approver</option>
+                <option>Location Manager</option>
+                <option>Admin</option>
+              </select>
+            </div>
+            <p class="rules-note">Role mismatches always go to the Location Manager. Expired certificates are always blocked.</p>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="impact-title">
+          <div class="card-head">
+            <div>
+              <h2 id="impact-title">Impact on the sample week</h2>
+              <p class="card-sub">20 sample swaps checked against these rules.</p>
+            </div>
+            <a class="link" href="#/replay">Replay<span data-icon="chevron"></span></a>
+          </div>
+          <div id="impact-body"></div>
+        </section>
+      </div>
+    </main>
+
+    <!-- Staff & shifts -->
+    <main class="page" data-page="staff" hidden>
+      <header class="page-head">
+        <div>
+          <h1 tabindex="-1">Staff &amp; shifts</h1>
+          <p>Each location has its own team and shifts. Swaps only happen within a location.</p>
+        </div>
+        <div class="segmented" id="staff-tabs" role="group" aria-label="Location"></div>
+      </header>
+
+      <section class="card" aria-labelledby="team-title">
+        <h2 id="team-title">Team</h2>
+        <p class="card-sub" id="team-sub"></p>
+        <div id="team-body"></div>
+      </section>
+
+      <section class="card mt" aria-labelledby="shifts-title">
+        <h2 id="shifts-title">Shifts up for swap</h2>
+        <p class="card-sub">Start a swap to check who can take one.</p>
+        <div id="shift-body"></div>
+      </section>
+    </main>
+
+    <!-- Replay -->
+    <main class="page" data-page="replay" hidden>
+      <header class="page-head">
+        <div>
+          <h1 tabindex="-1">Replay</h1>
+          <p>20 sample swaps across both locations, each checked on its own against the current rules.</p>
+        </div>
+        <button type="button" class="btn" id="btn-replay">Replay 20 sample swaps</button>
+      </header>
+      <div id="replay-body"></div>
+    </main>
+
+    <!-- Decision log -->
+    <main class="page" data-page="log" hidden>
+      <header class="page-head">
+        <div>
+          <h1 tabindex="-1">Decision log</h1>
+          <p>Every checked swap, newest first. Keeps the last 20.</p>
+        </div>
+        <span class="tag" id="log-count">0 swaps</span>
+      </header>
+      <section class="card" aria-label="Checked swaps">
+        <div id="log-body"></div>
+      </section>
+    </main>
+
+    <footer class="footer">Built for the Shiftwell product case. All names and data are fictional.</footer>
+  </div>
+</div>
+
+<script>
+/* ENGINE START */
+const TODAY = '2026-10-18';
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+const DEFAULT_RULES = { autoApproval: true, checkRole: true, checkCerts: true, limit: 48, overLimitTo: 'Regional Approver' };
+const AUTO_OFF_REASON = 'Auto-approval off: manual approval (how Shiftwell works today)';
+
+const LOCATIONS = [
+  { id: 'freshbowl', name: 'FreshBowl', area: 'Koregaon Park', kind: 'restaurant' },
+  { id: 'carepoint', name: 'CarePoint', area: 'Baner', kind: 'clinic' },
+];
+
+const CERTS_BY_ROLE = { Nurse: ['BLS', 'Nursing Council Registration'] };
+
+const STAFF = [
+  { id: 'rahul',  name: 'Rahul Patil',    location: 'freshbowl', role: 'Line Cook', trained: ['Line Cook', 'Grill'], hours: 40, certs: {} },
+  { id: 'sneha',  name: 'Sneha Kulkarni', location: 'freshbowl', role: 'Line Cook', trained: ['Line Cook'],          hours: 32, certs: {} },
+  { id: 'imran',  name: 'Imran Shaikh',   location: 'freshbowl', role: 'Grill',     trained: ['Grill', 'Line Cook'], hours: 44, certs: {} },
+  { id: 'priya',  name: 'Priya Deshmukh', location: 'freshbowl', role: 'Cashier',   trained: ['Cashier'],            hours: 36, certs: {} },
+  { id: 'arjun',  name: 'Arjun Jadhav',   location: 'freshbowl', role: 'Cashier',   trained: ['Cashier'],            hours: 24, certs: {} },
+  { id: 'anjali', name: 'Anjali Menon',   location: 'carepoint', role: 'Nurse', trained: ['Nurse'], hours: 36, certs: { 'BLS': '2027-03-10', 'Nursing Council Registration': '2027-12-31' } },
+  { id: 'kavita', name: 'Kavita Rao',     location: 'carepoint', role: 'Nurse', trained: ['Nurse'], hours: 30, certs: { 'BLS': '2026-09-30', 'Nursing Council Registration': '2027-06-30' } },
+  { id: 'deepak', name: 'Deepak Nair',    location: 'carepoint', role: 'Nurse', trained: ['Nurse'], hours: 24, certs: { 'BLS': '2027-01-15', 'Nursing Council Registration': '2026-10-10' } },
+  { id: 'meera',  name: 'Meera Joshi',    location: 'carepoint', role: 'Nurse', trained: ['Nurse'], hours: 46, certs: { 'BLS': '2026-12-20', 'Nursing Council Registration': '2027-08-31' } },
+  { id: 'rohan',  name: 'Rohan Gupta',    location: 'carepoint', role: 'Receptionist', trained: ['Receptionist'], hours: 40, certs: {} },
+];
+
+// S7-S13 exist only to give the replay a realistic spread of swaps.
+const SHIFTS = [
+  { id: 'S1',  location: 'freshbowl', role: 'Line Cook',    date: '2026-10-20', day: 'Tue', start: '18:00', end: '23:00', hours: 5, owner: 'sneha' },
+  { id: 'S2',  location: 'freshbowl', role: 'Grill',        date: '2026-10-21', day: 'Wed', start: '17:00', end: '23:00', hours: 6, owner: 'imran' },
+  { id: 'S3',  location: 'freshbowl', role: 'Cashier',      date: '2026-10-23', day: 'Fri', start: '12:00', end: '20:00', hours: 8, owner: 'priya' },
+  { id: 'S4',  location: 'carepoint', role: 'Nurse',        date: '2026-10-22', day: 'Thu', start: '08:00', end: '16:00', hours: 8, owner: 'anjali' },
+  { id: 'S5',  location: 'carepoint', role: 'Nurse',        date: '2026-10-24', day: 'Sat', start: '14:00', end: '22:00', hours: 8, owner: 'meera' },
+  { id: 'S6',  location: 'carepoint', role: 'Receptionist', date: '2026-10-19', day: 'Mon', start: '09:00', end: '17:00', hours: 8, owner: 'rohan' },
+  { id: 'S7',  location: 'freshbowl', role: 'Cashier',      date: '2026-10-24', day: 'Sat', start: '10:00', end: '16:00', hours: 6, owner: 'arjun',  replayOnly: true },
+  { id: 'S8',  location: 'freshbowl', role: 'Line Cook',    date: '2026-10-25', day: 'Sun', start: '11:00', end: '17:00', hours: 6, owner: 'rahul',  replayOnly: true },
+  { id: 'S9',  location: 'freshbowl', role: 'Grill',        date: '2026-10-24', day: 'Sat', start: '18:00', end: '23:00', hours: 5, owner: 'imran',  replayOnly: true },
+  { id: 'S10', location: 'freshbowl', role: 'Cashier',      date: '2026-10-25', day: 'Sun', start: '12:00', end: '18:00', hours: 6, owner: 'priya',  replayOnly: true },
+  { id: 'S11', location: 'freshbowl', role: 'Line Cook',    date: '2026-10-22', day: 'Thu', start: '12:00', end: '16:00', hours: 4, owner: 'rahul',  replayOnly: true },
+  { id: 'S12', location: 'carepoint', role: 'Nurse',        date: '2026-10-19', day: 'Mon', start: '08:00', end: '14:00', hours: 6, owner: 'deepak', replayOnly: true },
+  { id: 'S13', location: 'carepoint', role: 'Nurse',        date: '2026-10-23', day: 'Fri', start: '08:00', end: '16:00', hours: 8, owner: 'kavita', replayOnly: true },
+];
+
+// With default rules: 12 auto-approved, 3 role mismatch, 3 over hours, 2 blocked.
+const SAMPLES = [
+  ['S1', 'rahul'], ['S3', 'arjun'], ['S1', 'priya'], ['S4', 'kavita'], ['S5', 'anjali'],
+  ['S7', 'priya'], ['S1', 'imran'], ['S2', 'rahul'], ['S8', 'sneha'], ['S2', 'sneha'],
+  ['S12', 'anjali'], ['S9', 'rahul'], ['S4', 'meera'], ['S10', 'arjun'], ['S11', 'imran'],
+  ['S6', 'anjali'], ['S13', 'deepak'], ['S11', 'sneha'], ['S12', 'meera'], ['S13', 'anjali'],
+];
+
+const shiftById = (id) => SHIFTS.find((s) => s.id === id);
+const staffById = (id) => STAFF.find((p) => p.id === id);
+const firstName = (name) => name.split(' ')[0];
+
+function fmtDate(iso, withYear = true) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return d + ' ' + MONTHS[m - 1] + (withYear ? ' ' + y : '');
+}
+
+function evaluate(shift, taker, rules) {
+  const checks = [];
+  const failed = { role: false, cert: false, hours: false };
+  const failReasons = [];
+
+  if (!rules.checkRole) {
+    checks.push({ key: 'role', name: 'Role / training', status: 'skipped', text: 'Role check is off.' });
+  } else if (taker.trained.includes(shift.role)) {
+    checks.push({ key: 'role', name: 'Role / training', status: 'pass', text: `${taker.name} is trained for ${shift.role}.` });
+  } else {
+    failed.role = true;
+    const text = `${taker.name} is not trained for ${shift.role}.`;
+    checks.push({ key: 'role', name: 'Role / training', status: 'fail', text });
+    failReasons.push(text);
+  }
+
+  const required = CERTS_BY_ROLE[shift.role] || [];
+  if (!rules.checkCerts) {
+    checks.push({ key: 'cert', name: 'Certificates', status: 'skipped', text: 'Certificate check is off.' });
+  } else if (required.length === 0) {
+    checks.push({ key: 'cert', name: 'Certificates', status: 'pass', text: `${shift.role} shifts need no certificates.` });
+  } else {
+    const problems = [];
+    for (const cert of required) {
+      const expiry = taker.certs[cert];
+      if (!expiry) problems.push(`${taker.name} does not hold ${cert}.`);
+      else if (expiry < TODAY) problems.push(`${taker.name}'s ${cert} expired on ${fmtDate(expiry)}.`);
+      else if (expiry < shift.date) problems.push(`${taker.name}'s ${cert} expires on ${fmtDate(expiry)}, before the shift.`);
+    }
+    if (problems.length) {
+      failed.cert = true;
+      checks.push({ key: 'cert', name: 'Certificates', status: 'fail', text: problems.join(' ') });
+      failReasons.push(...problems);
+    } else {
+      checks.push({ key: 'cert', name: 'Certificates', status: 'pass', text: `${required.join(' and ')} valid on ${fmtDate(shift.date)}.` });
+    }
+  }
+
+  const total = taker.hours + shift.hours;
+  if (total <= rules.limit) {
+    checks.push({ key: 'hours', name: 'Weekly hours', status: 'pass', text: `${taker.name} would be at ${total} hrs this week (limit ${rules.limit}).` });
+  } else {
+    failed.hours = true;
+    const text = `${taker.name} would reach ${total} hrs this week (limit ${rules.limit}).`;
+    checks.push({ key: 'hours', name: 'Weekly hours', status: 'fail', text });
+    failReasons.push(text);
+  }
+
+  const base = { checks, total };
+  if (!rules.autoApproval) {
+    return { ...base, category: 'manual', tone: 'warning', label: 'Sent to Location Manager', short: 'Location Manager',
+      actsNext: 'Location Manager', summary: AUTO_OFF_REASON, reasons: [AUTO_OFF_REASON] };
+  }
+  if (failed.cert) {
+    return { ...base, category: 'blocked', tone: 'danger', label: 'Blocked', short: 'Blocked',
+      actsNext: "nobody. The swap can't go ahead until the certificate is renewed.",
+      summary: 'A required certificate is not valid on the shift date.', reasons: failReasons };
+  }
+  if (failed.role) {
+    return { ...base, category: 'role', tone: 'warning', label: 'Sent to Location Manager', short: 'Location Manager',
+      actsNext: 'Location Manager', summary: 'Not trained for this role, so the Location Manager decides.', reasons: failReasons };
+  }
+  if (failed.hours) {
+    return { ...base, category: 'hours', tone: 'info', label: 'Sent to ' + rules.overLimitTo, short: rules.overLimitTo,
+      actsNext: rules.overLimitTo, summary: `Over the weekly hours limit, so the ${rules.overLimitTo} decides.`, reasons: failReasons };
+  }
+  const ok = 'All checks passed. Approved in 0 seconds, no manager needed.';
+  return { ...base, category: 'auto', tone: 'success', label: 'Auto-approved instantly', short: 'Auto-approved',
+    actsNext: 'nobody', summary: ok, reasons: [ok] };
+}
+
+function runReplay(rules) {
+  const items = SAMPLES.map(([shiftId, takerId]) => {
+    const shift = shiftById(shiftId);
+    const taker = staffById(takerId);
+    return { shift, taker, result: evaluate(shift, taker, rules) };
+  });
+  const counts = { auto: 0, manual: 0, role: 0, hours: 0, blocked: 0 };
+  items.forEach((it) => { counts[it.result.category]++; });
+  return { items, counts };
+}
+/* ENGINE END */
+
+const ICONS = {
+  check: '<path d="M3.5 8.5l3 3 6-7" />',
+  cross: '<path d="M4.5 4.5l7 7m0-7l-7 7" />',
+  arrow: '<path d="M3 8h9.5M9 4.5L12.5 8 9 11.5" />',
+  clock: '<circle cx="8" cy="8" r="5.75" /><path d="M8 5v3.2l2 1.3" />',
+  dash:  '<path d="M4.5 8h7" />',
+  user:  '<circle cx="8" cy="5.5" r="2.5" /><path d="M3 13.5c.6-2.4 2.6-3.6 5-3.6s4.4 1.2 5 3.6" />',
+  chevron: '<path d="M6 3.5L10.5 8 6 12.5" />',
+  home:  '<path d="M2.5 7.2L8 2.5l5.5 4.7v6.3h-3.7v-4H6.2v4H2.5z" />',
+  swap:  '<path d="M3 5.5h9.5M10 3l2.5 2.5L10 8M13 10.5H3.5M6 8l-2.5 2.5L6 13" />',
+  sliders: '<path d="M2.5 4.5h2M7.5 4.5h6M2.5 11.5h6M11.5 11.5h2" /><circle cx="6" cy="4.5" r="1.5" /><circle cx="10" cy="11.5" r="1.5" />',
+  users: '<circle cx="6" cy="5.5" r="2.3" /><path d="M1.8 13.5c.5-2.2 2.2-3.4 4.2-3.4s3.7 1.2 4.2 3.4M10.6 3.3a2.3 2.3 0 010 4.4M12 10.3c1.2.4 2 1.6 2.3 3.2" />',
+  replay: '<path d="M2.9 8a5.1 5.1 0 105.1-5.1c-1.6 0-3 .7-4 1.9" /><path d="M3.6 2v3h3" />',
+  list:  '<path d="M6 4h7.5M6 8h7.5M6 12h7.5M2.5 4h.5M2.5 8h.5M2.5 12h.5" />',
+};
+const TONE_ICON = { success: 'check', warning: 'arrow', info: 'clock', danger: 'cross' };
+const STATUS = {
+  pass:    { tone: 'success', icon: 'check', word: 'Passed' },
+  fail:    { tone: 'danger',  icon: 'cross', word: 'Failed' },
+  skipped: { tone: 'skip',    icon: 'dash',  word: 'Skipped' },
+};
+const ROUTES = { overview: 'Overview', swap: 'New swap', rules: 'Rules', staff: 'Staff & shifts', replay: 'Replay', log: 'Decision log' };
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const icon = (name) => `<svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
+const pill = (tone, text) => `<span class="pill tone-${tone}">${icon(TONE_ICON[tone])}${esc(text)}</span>`;
+const locById = (id) => LOCATIONS.find((l) => l.id === id);
+
+const shiftOption = (s) => `${s.id} · ${s.role} · ${s.day} ${fmtDate(s.date, false)} · ${s.hours} hrs · from ${firstName(staffById(s.owner).name)}`;
+const shiftShort = (s) => `${s.id} · ${s.role} · ${s.day} ${fmtDate(s.date, false)}`;
+
+const state = {
+  rules: { ...DEFAULT_RULES },
+  locationId: 'freshbowl',
+  shiftId: 'S1',
+  takerId: 'rahul',
+  staffLocation: 'freshbowl',
+  replayShown: false,
+  replayFilter: 'all',
+  log: [],
+};
+
+/* Routing */
+function currentRoute() {
+  const r = location.hash.replace(/^#\/?/, '');
+  return ROUTES[r] ? r : 'overview';
+}
+
+function showRoute(moveFocus) {
+  const route = currentRoute();
+  document.querySelectorAll('[data-page]').forEach((p) => { p.hidden = p.dataset.page !== route; });
+  document.querySelectorAll('.nav a').forEach((a) => {
+    if (a.dataset.route === route) a.setAttribute('aria-current', 'page');
+    else a.removeAttribute('aria-current');
+  });
+  document.title = route === 'overview' ? 'Shiftwell Swap Auto-Approval' : `${ROUTES[route]} · Shiftwell`;
+  if (moveFocus) {
+    window.scrollTo(0, 0);
+    document.querySelector(`[data-page="${route}"] h1`).focus({ preventScroll: true });
+  }
+}
+
+/* Shared pieces */
+function fillSelect(el, options, selected) {
+  el.innerHTML = options.map((o) => `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('');
+  const keep = options.some((o) => o.value === selected);
+  el.value = keep ? selected : options[0].value;
+  return el.value;
+}
+
+function fillShifts() {
+  const options = SHIFTS.filter((s) => s.location === state.locationId && !s.replayOnly)
+    .map((s) => ({ value: s.id, label: shiftOption(s) }));
+  state.shiftId = fillSelect($('f-shift'), options, state.shiftId);
+}
+
+function fillTakers() {
+  const shift = shiftById(state.shiftId);
+  const options = STAFF.filter((p) => p.location === state.locationId && p.id !== shift.owner)
+    .map((p) => ({ value: p.id, label: `${p.name} (${p.role}, ${p.hours} hrs)` }));
+  state.takerId = fillSelect($('f-taker'), options, state.takerId);
+}
+
+function countItems(items) {
+  const counts = { auto: 0, manual: 0, role: 0, hours: 0, blocked: 0 };
+  items.forEach((it) => { counts[it.result.category]++; });
+  return counts;
+}
+
+function outcomeRows(counts) {
+  return [
+    { tone: 'success', label: 'Auto-approved', value: counts.auto, sub: 'approved instantly' },
+    { tone: 'warning', label: 'Location Manager', value: counts.manual + counts.role, sub: state.rules.autoApproval ? 'role mismatch' : 'manual approval' },
+    { tone: 'info', label: state.rules.overLimitTo, value: counts.hours, sub: `over ${state.rules.limit} hrs` },
+    { tone: 'danger', label: 'Blocked', value: counts.blocked, sub: 'expired certificate' },
+  ];
+}
+
+const pctOf = (k, n) => (n ? Math.round((k / n) * 100) : 0) + '%';
+
+function compareHTML(n, auto) {
+  return `<p class="compare">Today: <strong>${n} of ${n}</strong> swaps wait for a manager. With rules: <strong>${auto} of ${n}</strong> approved instantly, <strong>${n - auto}</strong> need a human.</p>`;
+}
+
+function summaryHTML(items) {
+  const n = items.length;
+  const counts = countItems(items);
+  return `
+    <div class="stats">${outcomeRows(counts).map((s) => `
+      <div class="stat tone-${s.tone}">
+        <div class="stat-label">${icon(TONE_ICON[s.tone])}${esc(s.label)}</div>
+        <div class="stat-value">${pctOf(s.value, n)}</div>
+        <div class="stat-sub">${s.value} of ${n} · ${esc(s.sub)}</div>
+      </div>`).join('')}
+    </div>
+    ${compareHTML(n, counts.auto)}`;
+}
+
+/* Overview */
+function renderOverview() {
+  $('ov-summary').innerHTML = summaryHTML(runReplay(state.rules).items);
+  const onOff = (v) => (v ? 'On' : 'Off');
+  const rows = [
+    ['Auto-approval', onOff(state.rules.autoApproval)],
+    ['Role / training check', onOff(state.rules.checkRole)],
+    ['Certificate check', onOff(state.rules.checkCerts)],
+    ['Weekly hours limit', `${state.rules.limit} hrs`],
+    ['Over-limit swaps go to', state.rules.overLimitTo],
+  ];
+  $('ov-rules').innerHTML = rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('');
+}
+
+/* New swap */
+function certSummary(person) {
+  const required = CERTS_BY_ROLE[person.role] || [];
+  if (!required.length) return '<span>No certificates needed</span>';
+  const expired = required.filter((c) => !person.certs[c] || person.certs[c] < TODAY);
+  if (expired.length) {
+    const detail = expired.map((c) => `${c === 'BLS' ? 'BLS' : 'Registration'} expired ${fmtDate(person.certs[c])}`).join(', ');
+    return `<span class="pill tone-danger">${icon('cross')}Expired</span><span>${esc(detail)}</span>`;
+  }
+  const soonest = required.map((c) => person.certs[c]).sort()[0];
+  return `<span class="pill tone-success">${icon('check')}Valid</span><span>until ${esc(fmtDate(soonest))}</span>`;
+}
+
+function renderStaff() {
+  const loc = locById(state.locationId);
+  const shift = shiftById(state.shiftId);
+  $('staff-title').textContent = `Staff at ${loc.name}`;
+  $('staff-sub').textContent = `${loc.area} · ${loc.kind}`;
+  $('staff-list').innerHTML = STAFF.filter((p) => p.location === state.locationId).map((p) => {
+    const selected = p.id === state.takerId;
+    const tag = selected ? 'Taking shift' : p.id === shift.owner ? 'Shift owner' : '';
+    const pct = Math.min(100, Math.round((p.hours / state.rules.limit) * 100));
+    const hoursText = selected
+      ? `${p.hours} → ${p.hours + shift.hours} hrs with this shift`
+      : `${p.hours} hrs this week`;
+    const over = selected && p.hours + shift.hours > state.rules.limit;
+    return `<li class="person${selected ? ' selected' : ''}"${selected ? ' aria-current="true"' : ''}>
+      <div class="person-top"><span class="person-name">${esc(p.name)}</span>${tag ? `<span class="person-tag">${tag}</span>` : ''}</div>
+      <div class="person-meta">${esc(p.role)} · ${esc(hoursText)}</div>
+      <div class="meter${over ? ' over' : ''}" aria-hidden="true"><span style="width:${pct}%"></span></div>
+      <div class="person-certs">${certSummary(p)}</div>
+    </li>`;
+  }).join('');
+}
+
+function renderResult(result, shift, taker, logged) {
+  const owner = staffById(shift.owner);
+  const checks = result.checks.map((c) => {
+    const st = STATUS[c.status];
+    return `<li class="tone-${st.tone}">
+      <span class="check-ico">${icon(st.icon)}</span>
+      <div><div class="check-name">${esc(c.name)} · <span class="check-status">${st.word}</span></div>
+      <div class="check-text">${esc(c.text)}</div></div>
+    </li>`;
+  }).join('');
+  const body = $('result-body');
+  body.innerHTML = `
+    <p class="swap-line"><strong>${esc(taker.name)}</strong> takes ${esc(shift.id)} · ${esc(shift.role)} · ${shift.day} ${fmtDate(shift.date, false)}, ${shift.start}–${shift.end} from ${esc(owner.name)}</p>
+    <div class="outcome tone-${result.tone}">
+      <span class="outcome-ico">${icon(TONE_ICON[result.tone])}</span>
+      <div><div class="outcome-label">${esc(result.label)}</div><div class="outcome-sub">${esc(result.summary)}</div></div>
+    </div>
+    <ul class="checks" aria-label="Checks">${checks}</ul>
+    <p class="next">${icon('user')}<span>Who acts next: <strong>${esc(result.actsNext)}</strong></span>${logged ? `<a class="link" href="#/log">Added to decision log${icon('chevron')}</a>` : ''}</p>`;
+  body.classList.remove('fade-in');
+  void body.offsetWidth;
+  body.classList.add('fade-in');
+}
+
+function currentRequest() {
+  const shift = shiftById(state.shiftId);
+  const taker = staffById(state.takerId);
+  return { shift, taker, result: evaluate(shift, taker, state.rules) };
+}
+
+function checkSwap(addToLog) {
+  const { shift, taker, result } = currentRequest();
+  renderResult(result, shift, taker, addToLog);
+  if (addToLog) {
+    const time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    state.log.unshift({ time, taker: taker.name, shift: `${shiftShort(shift)} · ${locById(shift.location).name}`, tone: result.tone, short: result.short, reason: result.reasons.join(' ') });
+    state.log = state.log.slice(0, 20);
+    renderLog();
+  }
+}
+
+/* Rules */
+function renderImpact() {
+  const { items, counts } = runReplay(state.rules);
+  const n = items.length;
+  $('impact-body').innerHTML = `
+    <dl class="kv">${outcomeRows(counts).map((r) => `<div><dt>${pill(r.tone, r.label)}</dt><dd>${r.value} of ${n} · ${pctOf(r.value, n)}</dd></div>`).join('')}</dl>
+    ${compareHTML(n, counts.auto)}`;
+}
+
+/* Staff & shifts */
+function certDetail(person) {
+  const required = CERTS_BY_ROLE[person.role] || [];
+  if (!required.length) return '<span class="muted">None needed</span>';
+  return required.map((c) => {
+    const expiry = person.certs[c];
+    const valid = expiry && expiry >= TODAY;
+    const badge = valid ? `<span class="pill tone-success">${icon('check')}Valid</span>` : `<span class="pill tone-danger">${icon('cross')}Expired</span>`;
+    const when = expiry ? `${valid ? 'until' : 'expired'} ${fmtDate(expiry)}` : 'not held';
+    return `<div class="cert">${badge}<span>${esc(c)} · ${esc(when)}</span></div>`;
+  }).join('');
+}
+
+function renderStaffPage() {
+  const loc = locById(state.staffLocation);
+  $('staff-tabs').innerHTML = LOCATIONS.map((l) =>
+    `<button type="button" data-loc="${l.id}" aria-pressed="${l.id === loc.id}">${esc(l.name)}, ${esc(l.area)}</button>`).join('');
+  $('team-sub').textContent = `${loc.name}, ${loc.area} (${loc.kind})`;
+
+  const people = STAFF.filter((p) => p.location === loc.id);
+  $('team-body').innerHTML = `
+    <div class="trow thead"><span>Name</span><span>Trained for</span><span>Hours this week</span><span>Certificates</span></div>
+    ${people.map((p) => {
+      const pct = Math.min(100, Math.round((p.hours / state.rules.limit) * 100));
+      return `<div class="trow">
+        <div><div class="person-name">${esc(p.name)}</div><div class="person-meta">${esc(p.role)}</div></div>
+        <div><span class="m-label">Trained for</span>${esc(p.trained.join(', '))}</div>
+        <div><span class="m-label">Hours this week</span>${p.hours} of ${state.rules.limit} hrs<div class="meter" aria-hidden="true"><span style="width:${pct}%"></span></div></div>
+        <div><span class="m-label">Certificates</span><div class="cert-list">${certDetail(p)}</div></div>
+      </div>`;
+    }).join('')}`;
+
+  $('shift-body').innerHTML = SHIFTS.filter((s) => s.location === loc.id && !s.replayOnly).map((s) => `
+    <div class="shift-row">
+      <div class="ri-main">
+        <div class="ri-name">${esc(s.id)} · ${esc(s.role)}</div>
+        <div class="ri-shift">${s.day} ${fmtDate(s.date, false)}, ${s.start}–${s.end} · ${s.hours} hrs · from ${esc(staffById(s.owner).name)}</div>
+      </div>
+      <a class="btn btn-secondary btn-sm" href="#/swap" data-shift="${s.id}">Start swap</a>
+    </div>`).join('');
+}
+
+/* Replay */
+function renderReplay() {
+  const body = $('replay-body');
+  if (!state.replayShown) {
+    body.innerHTML = '<p class="empty">Press Replay to run 20 sample swaps through the current rules and see how many skip the manager queue.</p>';
+    return;
+  }
+  const all = runReplay(state.rules).items.map((it, i) => ({ ...it, n: i + 1 }));
+  const items = state.replayFilter === 'all' ? all : all.filter((it) => it.shift.location === state.replayFilter);
+  const filters = [{ id: 'all', label: 'All locations' }, ...LOCATIONS.map((l) => ({ id: l.id, label: l.name }))];
+  body.innerHTML = `
+    <div class="segmented replay-filter" role="group" aria-label="Filter by location">${filters.map((f) =>
+      `<button type="button" data-filter="${f.id}" aria-pressed="${f.id === state.replayFilter}">${esc(f.label)}</button>`).join('')}
+    </div>
+    ${summaryHTML(items)}
+    <section class="card mt" aria-label="Sample swaps">
+      <ol class="replay-list" style="margin-top:0">${items.map((it) => `
+        <li class="ri" title="${esc(it.result.reasons.join(' '))}">
+          <span class="ri-num">${it.n}</span>
+          <div class="ri-main"><div class="ri-name">${esc(it.taker.name)}</div><div class="ri-shift">${esc(shiftShort(it.shift))} · ${it.shift.hours} hrs · ${esc(locById(it.shift.location).name)}</div></div>
+          ${pill(it.result.tone, it.result.short)}
+        </li>`).join('')}
+      </ol>
+    </section>`;
+}
+
+/* Decision log */
+function renderLog() {
+  const count = state.log.length;
+  $('log-count').textContent = count === 1 ? '1 swap' : `${count} swaps`;
+  $('nav-log-count').textContent = count;
+  $('nav-log-count').hidden = count === 0;
+  if (!count) {
+    $('log-body').innerHTML = '<p class="empty">No swaps checked yet. Each "Check swap" click on <a class="link" href="#/swap">New swap</a> adds a row here.</p>';
+    return;
+  }
+  $('log-body').innerHTML = `
+    <div class="log-row log-head"><span>Time</span><span>Swap</span><span>Outcome</span><span>Reason</span></div>
+    ${state.log.map((r) => `
+      <div class="log-row">
+        <span class="log-time">${esc(r.time)}</span>
+        <span class="log-who"><strong>${esc(r.taker)}</strong><span>${esc(r.shift)}</span></span>
+        <span>${pill(r.tone, r.short)}</span>
+        <span class="log-reason">${esc(r.reason)}</span>
+      </div>`).join('')}`;
+}
+
+function onRulesChange() {
+  checkSwap(false);
+  renderStaff();
+  renderStaffPage();
+  renderReplay();
+  renderOverview();
+  renderImpact();
+}
+
+function init() {
+  document.querySelectorAll('[data-icon]').forEach((el) => { el.outerHTML = icon(el.dataset.icon); });
+
+  fillSelect($('f-location'), LOCATIONS.map((l) => ({ value: l.id, label: `${l.name}, ${l.area}` })), state.locationId);
+  fillShifts();
+  fillTakers();
+
+  $('f-location').addEventListener('change', (e) => {
+    state.locationId = e.target.value;
+    fillShifts();
+    fillTakers();
+    renderStaff();
+  });
+  $('f-shift').addEventListener('change', (e) => {
+    state.shiftId = e.target.value;
+    fillTakers();
+    renderStaff();
+  });
+  $('f-taker').addEventListener('change', (e) => {
+    state.takerId = e.target.value;
+    renderStaff();
+  });
+  $('btn-check').addEventListener('click', () => checkSwap(true));
+  $('link-all-staff').addEventListener('click', () => {
+    state.staffLocation = state.locationId;
+    renderStaffPage();
+  });
+
+  $('staff-tabs').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-loc]');
+    if (!btn) return;
+    state.staffLocation = btn.dataset.loc;
+    renderStaffPage();
+  });
+  $('shift-body').addEventListener('click', (e) => {
+    const link = e.target.closest('[data-shift]');
+    if (!link) return;
+    const shift = shiftById(link.dataset.shift);
+    state.locationId = shift.location;
+    state.shiftId = shift.id;
+    $('f-location').value = shift.location;
+    fillShifts();
+    fillTakers();
+    renderStaff();
+  });
+
+  $('btn-replay').addEventListener('click', () => {
+    state.replayShown = true;
+    renderReplay();
+  });
+  $('replay-body').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-filter]');
+    if (!btn) return;
+    state.replayFilter = btn.dataset.filter;
+    renderReplay();
+  });
+
+  const toggles = { 'r-auto': 'autoApproval', 'r-role': 'checkRole', 'r-cert': 'checkCerts' };
+  Object.entries(toggles).forEach(([id, key]) => {
+    $(id).addEventListener('change', (e) => {
+      state.rules[key] = e.target.checked;
+      onRulesChange();
+    });
+  });
+  const limit = $('r-limit');
+  limit.addEventListener('input', () => {
+    const v = Number(limit.value);
+    const valid = limit.value !== '' && Number.isInteger(v) && v >= 1 && v <= 168;
+    limit.setAttribute('aria-invalid', valid ? 'false' : 'true');
+    if (valid && v !== state.rules.limit) {
+      state.rules.limit = v;
+      onRulesChange();
+    }
+  });
+  limit.addEventListener('change', () => {
+    limit.value = state.rules.limit;
+    limit.setAttribute('aria-invalid', 'false');
+  });
+  $('r-route').addEventListener('change', (e) => {
+    state.rules.overLimitTo = e.target.value;
+    onRulesChange();
+  });
+
+  window.addEventListener('hashchange', () => showRoute(true));
+
+  renderStaff();
+  checkSwap(false);
+  renderStaffPage();
+  renderReplay();
+  renderOverview();
+  renderImpact();
+  renderLog();
+  showRoute(false);
+}
+
+init();
+</script>
+</body>
+</html>
